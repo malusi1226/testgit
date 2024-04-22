@@ -1,23 +1,29 @@
-
-def find_matches(blanks, words, range_x=10, range_y=10):
+def find_matches_based_on_top_right(blanks, words, range_x=50, range_y=50):
     matches = {}
     for blank in blanks:
-        # 计算预设范围
+        # 定义搜索区域：基于blank的右上角
         search_left = blank['right']
         search_right = blank['right'] + range_x
         search_top = blank['top']
-        search_bottom = blank['bottom'] + range_y
+        search_bottom = blank['top'] + range_y
 
-        # 在words列表中查找匹配的word
-        found_words = []
+        # 初始化最佳匹配和最小距离
+        best_match = None
+        min_distance = float('inf')
+
+        # 在words列表中查找落在搜索区域内的word
         for word in words:
-            # 检查word是否在预设范围内
-            if (word['left'] < search_right and word['right'] > search_left and
-                word['top'] < search_bottom and word['bottom'] > search_top):
-                found_words.append(word['word'])
+            if (word['left'] >= search_left and word['left'] <= search_right and
+                word['top'] >= search_top and word['top'] <= search_bottom):
+                # 计算到搜索区域左边界的距离
+                distance = word['left'] - search_left
+                if distance < min_distance:
+                    best_match = word['word']
+                    min_distance = distance
 
-        # 将找到的words列表关联到当前的blank
-        matches[blank['word']] = found_words
+        # 如果找到匹配的word，将其与blank关联
+        if best_match:
+            matches[blank['word']] = best_match
 
     return matches
 
@@ -28,11 +34,11 @@ blanks = [
 ]
 
 words = [
-    {'left': 210, 'right': 260, 'top': 120, 'bottom': 170, 'word': 'word1'},
-    {'left': 205, 'right': 255, 'top': 130, 'bottom': 180, 'word': 'word2'},
+    {'left': 210, 'right': 260, 'top': 110, 'bottom': 160, 'word': 'word1'},
+    {'left': 450, 'right': 500, 'top': 310, 'bottom': 360, 'word': 'word2'},
     {'left': 350, 'right': 400, 'top': 320, 'bottom': 370, 'word': 'word3'}
 ]
 
 # 查找匹配
-matches = find_matches(blanks, words)
+matches = find_matches_based_on_top_right(blanks, words)
 print(matches)
