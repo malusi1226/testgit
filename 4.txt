@@ -1,5 +1,5 @@
 def find_matches_based_on_top_right(blanks, words, range_x=50, range_y=50):
-    matches = {}
+    matches = []
     for blank in blanks:
         # 定义搜索区域：基于blank的右上角
         search_left = blank['right']
@@ -21,9 +21,9 @@ def find_matches_based_on_top_right(blanks, words, range_x=50, range_y=50):
                     best_match = word['word']
                     min_distance = distance
 
-        # 如果找到匹配的word，将其与blank关联
-        if best_match:
-            matches[blank['word']] = best_match
+        # 将匹配结果加入列表，每个结果是一个字典
+        match_result = {blank['word']: best_match}
+        matches.append(match_result)
 
     return matches
 
