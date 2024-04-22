@@ -1,1 +1,38 @@
 
+def find_matches(blanks, words, range_x=10, range_y=10):
+    matches = {}
+    for blank in blanks:
+        # 计算预设范围
+        search_left = blank['right']
+        search_right = blank['right'] + range_x
+        search_top = blank['top']
+        search_bottom = blank['bottom'] + range_y
+
+        # 在words列表中查找匹配的word
+        found_words = []
+        for word in words:
+            # 检查word是否在预设范围内
+            if (word['left'] < search_right and word['right'] > search_left and
+                word['top'] < search_bottom and word['bottom'] > search_top):
+                found_words.append(word['word'])
+
+        # 将找到的words列表关联到当前的blank
+        matches[blank['word']] = found_words
+
+    return matches
+
+# 示例列表
+blanks = [
+    {'left': 100, 'right': 200, 'top': 100, 'bottom': 150, 'word': 'blank1'},
+    {'left': 300, 'right': 400, 'top': 300, 'bottom': 350, 'word': 'blank2'}
+]
+
+words = [
+    {'left': 210, 'right': 260, 'top': 120, 'bottom': 170, 'word': 'word1'},
+    {'left': 205, 'right': 255, 'top': 130, 'bottom': 180, 'word': 'word2'},
+    {'left': 350, 'right': 400, 'top': 320, 'bottom': 370, 'word': 'word3'}
+]
+
+# 查找匹配
+matches = find_matches(blanks, words)
+print(matches)
