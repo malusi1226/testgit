@@ -3,18 +3,24 @@ def extend_right(input_box, boxes):
     Extend the 'right' of the input box to just before the left side of any box that is directly to its right.
     
     Args:
-    input_box (tuple): A tuple of (left, right, top, bottom) for the input box.
-    boxes (list of tuples): A list of tuples where each tuple represents a box (left, right, top, bottom).
+    input_box (dict): A dictionary with keys 'left', 'right', 'top', 'bottom' representing the input box.
+    boxes (list of dicts): A list of dictionaries, each with keys 'left', 'right', 'top', 'bottom' representing each box.
     
     Returns:
-    tuple: The adjusted input_box if a box is found to the right; otherwise, the original input_box.
+    dict: The adjusted input_box if a box is found to the right; otherwise, the original input_box.
     """
-    input_left, input_right, input_top, input_bottom = input_box
+    input_left = input_box['left']
+    input_right = input_box['right']
+    input_top = input_box['top']
+    input_bottom = input_box['bottom']
     min_left = None
 
     # Iterate over each box in the list
     for box in boxes:
-        left, right, top, bottom = box
+        left = box['left']
+        right = box['right']
+        top = box['top']
+        bottom = box['bottom']
         
         # Check if the current box is to the right of the input box and overlaps vertically
         if left > input_right and not (bottom <= input_top or top >= input_bottom):
@@ -24,14 +30,16 @@ def extend_right(input_box, boxes):
     
     # If a nearest right box is found, adjust the 'right' of the input box
     if min_left is not None:
-        return (input_left, min_left - 1, input_top, input_bottom)
+        input_box['right'] = min_left - 1
     
-    # If no box is found to the right, return the original input box
     return input_box
 
 # Example usage:
-input_box = (10, 20, 10, 20)
-boxes = [(25, 35, 15, 25), (40, 50, 10, 20), (21, 30, 5, 15)]
+input_box = {'left': 10, 'right': 20, 'top': 10, 'bottom': 20}
+boxes = [
+    {'left': 25, 'right': 35, 'top': 15, 'bottom': 25},
+    {'left': 40, 'right': 50, 'top': 10, 'bottom': 20},
+    {'left': 21, 'right': 30, 'top': 5, 'bottom': 15}
+]
 adjusted_box = extend_right(input_box, boxes)
 print("Adjusted Input Box:", adjusted_box)
-
