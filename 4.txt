@@ -1,47 +1,54 @@
 from fuzzywuzzy import fuzz
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 def compute_metrics(predictions, truths):
     # 预处理，将键值对展开为列表
     pred_keys = [list(d.keys())[0].strip().lower().replace(" ", "") for d in predictions]
     true_keys = [list(d.keys())[0].strip().lower().replace(" ", "") for d in truths]
     
+    # 用于跟踪找到的匹配
+    matched_pred_indices = set()
+    matched_true_indices = set()
+    
     # 初始化标签列表
     pred_labels = []
     true_labels = []
-    
-    # 评估预测结果
-    for pred_key in pred_keys:
-        matched = False  # 标记预测键值对是否找到匹配
-        for i, true_key in enumerate(true_keys):
-            similarity = fuzz.token_sort_ratio(pred_key, true_key)
-            if similarity >= 80:  # 如果找到合适的匹配
-                pred_labels.append(1)
-                true_labels.append(1)  # 标记此真实键值对已被匹配
-                matched = True
-                break
-        if not matched:
-            pred_labels.append(0)  # 如果未找到匹配，标记为0
-            true_labels.append(1)  # 这里假设应该有匹配的真实项，但未被识别，所以标记为1
 
-    # 处理没有对应预测项的真实键值对
-    for true_key in true_keys:
-        if true_key not in [list(d.keys())[0].strip().lower().replace(" ", "") for d in predictions]:
-            true_labels.append(1)  # 有真实键值对未被预测到
-            pred_labels.append(0)  # 预测标签中相应地添加0
+    # 遍历每个预测键，尝试找到匹配的真实键
+    for pred_index, pred_key in enumerate(pred_keys):
+        for true_index, true_key in enumerate(true_keys):
+            if true_index not in matched_true_indices and pred_index not in matched_pred_indices:
+                similarity = fuzz.token_sort_ratio(pred_key, true_key)
+                if similarity >= 80:  # 如果找到合适的匹配
+                    matched_pred_indices.add(pred_index)
+                    matched_true_indices.add(true_index)
+                    pred_labels.append(1)
+                    true_labels.append(1)
+                    break
 
-    # 计算准确率、召回率和F1分数
+    # 处理未匹配的预测键和真实键
+    for index in range(len(pred_keys)):
+        if index not in matched_pred_indices:
+            pred_labels.append(0)
+
+    for index in range(len(true_keys)):
+        if index not in matched_true_indices:
+            true_labels.append(0)
+
+    # 计算准确率、召回率、F1分数
+    accuracy = accuracy_score(true_labels, pred_labels)
     precision = precision_score(true_labels, pred_labels)
     recall = recall_score(true_labels, pred_labels)
     f1 = f1_score(true_labels, pred_labels)
 
-    return precision, recall, f1
+    return accuracy, precision, recall, f1
 
 # 示例数据
-ocr_results = [{" Monthly": "blank"}, {" Settlement Date Basis": "error_value"}, {" Extra Key": "not needed"}]
-manual_results = [{" Monthly": "blank"}, {" Settlement Date Basis": "correct_value"}, {" Missing Key": "value"}]
+ocr_results = [{" Key": "value"}, {" Key": "value"}, {" Extra Key": "not needed"}]
+manual_results = [{" Key": "value"}, {" Key": "value"}]
 
-precision, recall, f1 = compute_metrics(ocr_results, manual_results)
+accuracy, precision, recall, f1 = compute_metrics(ocr_results, manual_results)
+print(f"Accuracy: {accuracy:.2f}")
 print(f"Precision: {precision:.2f}")
 print(f"Recall: {recall:.2f}")
 print(f"F1 Score: {f1:.2f}")
