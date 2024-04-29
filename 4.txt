@@ -1,79 +1,38 @@
-def load_data(extracted, verified):
-    """
-    Load extracted and manually verified data.
-    This function assumes both inputs are list of dictionaries.
-    """
-    return extracted, verified
+from fuzzywuzzy import fuzz
+from sklearn.metrics import precision_score, recall_score, f1_score
 
-def edit_distance(s1, s2):
-    """
-    Calculate the Levenshtein distance between two strings.
-    """
-    if len(s1) > len(s2):
-        s1, s2 = s2, s1
-
-    distances = range(len(s1) + 1)
-    for index2, char2 in enumerate(s2):
-        new_distances = [index2 + 1]
-        for index1, char1 in enumerate(s1):
-            if char1 == char2:
-                new_distances.append(distances[index1])
-            else:
-                new_distances.append(1 + min((distances[index1], distances[index1 + 1], new_distances[-1])))
-        distances = new_distances
-    return distances[-1]
-
-def dynamic_edit_distance_tolerance(length):
-    """
-    Define the tolerance level for edit distance based on the length of the string.
-    """
-    if length < 5:
-        return 1
-    elif length <= 10:
-        return 2
-    else:
-        return 3
-
-def clean_data_with_custom_edit_distance(extracted, verified_keys):
-    """
-    Clean the extracted data by matching keys using custom edit distance within a tolerance determined by string length.
-    """
-    cleaned_data = []
-    for item in extracted:
-        key, value = list(item.items())[0]
-        key_clean = key.strip().lower()
-        
-        # Find the best match based on edit distance within the defined tolerance
-        best_match = None
-        min_distance = float('inf')
-        for verified_key in verified_keys:
-            verified_key_clean = verified_key.strip().lower()
-            distance = edit_distance(key_clean, verified_key_clean)
-            tolerance = dynamic_edit_distance_tolerance(len(verified_key_clean))
-            if distance <= tolerance and distance < min_distance:
-                min_distance = distance
-                best_match = verified_key
-        
-        # Use the best match if found, otherwise use the original key
-        corrected_key = best_match if best_match else key
-        cleaned_data.append({corrected_key: value})
+def compute_metrics(predictions, truths):
+    # 预处理，将键值对展开为列表
+    pred_keys = [list(d.keys())[0].strip().lower().replace(" ", "") for d in predictions]
+    true_keys = [list(d.keys())[0].strip().lower().replace(" ", "") for d in truths]
     
-    return cleaned_data
+    # 生成二进制标签列表，1代表匹配，0代表不匹配
+    pred_labels = []
+    for pred_key in pred_keys:
+        # 计算与每个真实键的最高相似度
+        max_similarity = max(fuzz.token_sort_ratio(pred_key, true_key) for true_key in true_keys)
+        # 如果相似度大于阈值（例如80），则认为匹配
+        pred_labels.append(1 if max_similarity >= 80 else 0)
 
-def calculate_metrics(extracted, verified):
-    """
-    Calculate precision, recall, and F1-score.
-    """
-    # Flatten the list of dictionaries to a single dictionary for easier comparison
-    extracted_flat = {list(item.keys())[0]: list(item.values())[0] for item in extracted}
-    verified_flat = {list(item.keys())[0]: list(item.values())[0] for item in verified}
+    true_labels = []
+    for true_key in true_keys:
+        # 计算与每个预测键的最高相似度
+        max_similarity = max(fuzz.token_sort_ratio(true_key, pred_key) for pred_key in pred_keys)
+        # 如果相似度大于阈值（例如80），则认为匹配
+        true_labels.append(1 if max_similarity >= 80 else 0)
 
-    true_positives = sum(1 for key in extracted_flat if key in verified_flat and extracted_flat[key] == verified_flat[key])
-    false_positives = sum(1 for key in extracted_flat if key not in verified_flat or extracted_flat[key] != verified_flat[key])
-    false_negatives = sum(1 for key in verified_flat if key not in extracted_flat or extracted_flat[key] != verified_flat[key])
+    # 计算准确率、召回率和F1分数
+    precision = precision_score(true_labels, pred_labels)
+    recall = recall_score(true_labels, pred_labels)
+    f1 = f1_score(true_labels, pred_labels)
 
-    precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
-    recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
-    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    return precision, recall, f1
 
-    return precision, recall, f1_score
+# 示例数据
+ocr_results = [{" Monthly": "blank"}, {" Settlement Date Basis": "error_value"}]
+manual_results = [{" Monthly": "blank"}, {" Settlement Date Basis": "correct_value"}]
+
+precision, recall, f1 = compute_metrics(ocr_results, manual_results)
+print(f"Precision: {precision:.2f}")
+print(f"Recall: {recall:.2f}")
+print(f"F1 Score: {f1:.2f}")
