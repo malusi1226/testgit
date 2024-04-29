@@ -1,45 +1,54 @@
-def extend_right(input_box, boxes):
+import os
+import random
+
+def split_dataset(data_dir, train_ratio=0.8, dev_ratio=0.1, output_dir='./'):
     """
-    Extend the 'right' of the input box to just before the left side of any box that is directly to its right.
+    遍历指定目录，随机划分有标注的图片和对应的标注文件为训练集、验证集和测试集。
     
     Args:
-    input_box (dict): A dictionary with keys 'left', 'right', 'top', 'bottom' representing the input box.
-    boxes (list of dicts): A list of dictionaries, each with keys 'left', 'right', 'top', 'bottom' representing each box.
-    
-    Returns:
-    dict: The adjusted input_box if a box is found to the right; otherwise, the original input_box.
+    data_dir (str): 包含图片和标注文件的目录。
+    train_ratio (float): 分配给训练集的比例。
+    dev_ratio (float): 分配给验证集的比例。
+    output_dir (str): 输出文件存放的目录。
     """
-    input_left = input_box['left']
-    input_right = input_box['right']
-    input_top = input_box['top']
-    input_bottom = input_box['bottom']
-    min_left = None
+    # 确保比例之和为1
+    test_ratio = 1 - (train_ratio + dev_ratio)
+    if test_ratio < 0:
+        raise ValueError("训练集和验证集的比例总和不能超过1.")
 
-    # Iterate over each box in the list
-    for box in boxes:
-        left = box['left']
-        right = box['right']
-        top = box['top']
-        bottom = box['bottom']
-        
-        # Check if the current box is to the right of the input box and overlaps vertically
-        if left > input_right and not (bottom <= input_top or top >= input_bottom):
-            # Find the nearest 'left' of a box to the right of the input box
-            if min_left is None or left < min_left:
-                min_left = left
-    
-    # If a nearest right box is found, adjust the 'right' of the input box
-    if min_left is not None:
-        input_box['right'] = min_left - 1
-    
-    return input_box
+    # 收集所有图片文件和对应的标注文件
+    image_files = []
+    for root, dirs, files in os.walk(data_dir):
+        for file in files:
+            if file.endswith((".jpg", ".jpeg", ".png")):
+                image_path = os.path.join(root, file)
+                annotation_path = os.path.splitext(image_path)[0] + '.txt'
+                if os.path.exists(annotation_path):
+                    image_files.append(image_path)
 
-# Example usage:
-input_box = {'left': 10, 'right': 20, 'top': 10, 'bottom': 20}
-boxes = [
-    {'left': 25, 'right': 35, 'top': 15, 'bottom': 25},
-    {'left': 40, 'right': 50, 'top': 10, 'bottom': 20},
-    {'left': 21, 'right': 30, 'top': 5, 'bottom': 15}
-]
-adjusted_box = extend_right(input_box, boxes)
-print("Adjusted Input Box:", adjusted_box)
+    # 打乱文件顺序
+    random.shuffle(image_files)
+
+    # 分割文件列表
+    total_images = len(image_files)
+    train_end = int(total_images * train_ratio)
+    dev_end = train_end + int(total_images * dev_ratio)
+
+    train_files = image_files[:train_end]
+    dev_files = image_files[train_end:dev_end]
+    test_files = image_files[dev_end:]
+
+    # 写入分割后的文件路径到txt文件
+    def write_split_data(file_list, filename):
+        with open(os.path.join(output_dir, filename), 'w') as file:
+            for path in file_list:
+                file.write(path + '\n')
+
+    write_split_data(train_files, 'train.txt')
+    write_split_data(dev_files, 'dev.txt')
+    write_split_data(test_files, 'test.txt')
+
+# 使用示例
+data_directory = '/path/to/your/dataset'  # 替换为你的数据集目录
+output_directory = '/path/to/output'  # 替换为输出文件的保存目录
+split_dataset(data_directory, output_directory=output_directory)
