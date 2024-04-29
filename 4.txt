@@ -6,20 +6,29 @@ def compute_metrics(predictions, truths):
     pred_keys = [list(d.keys())[0].strip().lower().replace(" ", "") for d in predictions]
     true_keys = [list(d.keys())[0].strip().lower().replace(" ", "") for d in truths]
     
-    # 生成二进制标签列表，1代表匹配，0代表不匹配
+    # 初始化标签列表
     pred_labels = []
-    for pred_key in pred_keys:
-        # 计算与每个真实键的最高相似度
-        max_similarity = max(fuzz.token_sort_ratio(pred_key, true_key) for true_key in true_keys)
-        # 如果相似度大于阈值（例如80），则认为匹配
-        pred_labels.append(1 if max_similarity >= 80 else 0)
-
     true_labels = []
+    
+    # 评估预测结果
+    for pred_key in pred_keys:
+        matched = False  # 标记预测键值对是否找到匹配
+        for i, true_key in enumerate(true_keys):
+            similarity = fuzz.token_sort_ratio(pred_key, true_key)
+            if similarity >= 80:  # 如果找到合适的匹配
+                pred_labels.append(1)
+                true_labels.append(1)  # 标记此真实键值对已被匹配
+                matched = True
+                break
+        if not matched:
+            pred_labels.append(0)  # 如果未找到匹配，标记为0
+            true_labels.append(1)  # 这里假设应该有匹配的真实项，但未被识别，所以标记为1
+
+    # 处理没有对应预测项的真实键值对
     for true_key in true_keys:
-        # 计算与每个预测键的最高相似度
-        max_similarity = max(fuzz.token_sort_ratio(true_key, pred_key) for pred_key in pred_keys)
-        # 如果相似度大于阈值（例如80），则认为匹配
-        true_labels.append(1 if max_similarity >= 80 else 0)
+        if true_key not in [list(d.keys())[0].strip().lower().replace(" ", "") for d in predictions]:
+            true_labels.append(1)  # 有真实键值对未被预测到
+            pred_labels.append(0)  # 预测标签中相应地添加0
 
     # 计算准确率、召回率和F1分数
     precision = precision_score(true_labels, pred_labels)
@@ -29,8 +38,8 @@ def compute_metrics(predictions, truths):
     return precision, recall, f1
 
 # 示例数据
-ocr_results = [{" Monthly": "blank"}, {" Settlement Date Basis": "error_value"}]
-manual_results = [{" Monthly": "blank"}, {" Settlement Date Basis": "correct_value"}]
+ocr_results = [{" Monthly": "blank"}, {" Settlement Date Basis": "error_value"}, {" Extra Key": "not needed"}]
+manual_results = [{" Monthly": "blank"}, {" Settlement Date Basis": "correct_value"}, {" Missing Key": "value"}]
 
 precision, recall, f1 = compute_metrics(ocr_results, manual_results)
 print(f"Precision: {precision:.2f}")
