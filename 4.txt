@@ -1,65 +1,89 @@
-import os
-import random
-import shutil
-
-def split_and_copy_dataset(data_dir, train_ratio=0.8, dev_ratio=0.1, output_dir='./'):
+def load_data(extracted, verified):
     """
-    遍历指定目录，随机划分有标注的图片和对应的标注文件为训练集、验证集和测试集，
-    并将文件复制到对应的目录中。
+    Load extracted and manually verified data.
+    This function assumes both inputs are list of dictionaries.
+    """
+    return extracted, verified
+
+def edit_distance(s1, s2):
+    """
+    Calculate the Levenshtein distance between two strings.
+    """
+    if len(s1) > len(s2):
+        s1, s2 = s2, s1
+
+    distances = range(len(s1) + 1)
+    for index2, char2 in enumerate(s2):
+        new_distances = [index2 + 1]
+        for index1, char1 in enumerate(s1):
+            if char1 == char2:
+                new_distances.append(distances[index1])
+            else:
+                new_distances.append(1 + min((distances[index1], distances[index1 + 1], new_distances[-1])))
+        distances = new_distances
+    return distances[-1]
+
+def dynamic_edit_distance_tolerance(length):
+    """
+    Define the tolerance level for edit distance based on the length of the string.
+    """
+    if length < 5:
+        return 1
+    elif length <= 10:
+        return 2
+    else:
+        return 3
+
+def clean_data_with_custom_edit_distance(extracted, verified_keys):
+    """
+    Clean the extracted data by matching keys using custom edit distance within a tolerance determined by string length.
+    """
+    cleaned_data = []
+    for item in extracted:
+        key, value = list(item.items())[0]
+        key_clean = key.strip().lower()
+        
+        # Find the best match based on edit distance within the defined tolerance
+        best_match = None
+        min_distance = float('inf')
+        for verified_key in verified_keys:
+            verified_key_clean = verified_key.strip().lower()
+            distance = edit_distance(key_clean, verified_key_clean)
+            tolerance = dynamic_edit_distance_tolerance(len(verified_key_clean))
+            if distance <= tolerance and distance < min_distance:
+                min_distance = distance
+                best_match = verified_key
+        
+        # Use the best match if found, otherwise use the original key
+        corrected_key = best_match if best_match else key
+        cleaned_data.append({corrected_key: value})
     
-    Args:
-    data_dir (str): 包含图片和标注文件的目录。
-    train_ratio (float): 分配给训练集的比例。
-    dev_ratio (float): 分配给验证集的比例。
-    output_dir (str): 输出文件和目录存放的根目录。
+    return cleaned_data
+
+def calculate_metrics(extracted, verified):
     """
-    # 确保比例之和为1
-    test_ratio = 1 - (train_ratio + dev_ratio)
-    if test_ratio < 0:
-        raise ValueError("训练集和验证集的比例总和不能超过1.")
+    Calculate precision, recall, and F1-score.
+    Args:
+        extracted (list): List of dictionaries containing the extracted results.
+        verified (list): List of dictionaries containing the manually verified correct results.
+    Returns:
+        tuple: Returns precision, recall, and F1 score.
+    """
+    # Flatten the list of dictionaries to a single dictionary for easier comparison
+    extracted_flat = {list(item.keys())[0]: list(item.values())[0] for item in extracted}
+    verified_flat = {list(item.keys())[0]: list(item.values())[0] for item in verified}
 
-    # 创建训练、验证、测试目录
-    train_dir = os.path.join(output_dir, 'train')
-    dev_dir = os.path.join(output_dir, 'dev')
-    test_dir = os.path.join(output_dir, 'test')
-    os.makedirs(train_dir, exist_ok=True)
-    os.makedirs(dev_dir, exist_ok=True)
-    os.makedirs(test_dir, exist_ok=True)
+    true_positives = sum(1 for key in extracted_flat if key in verified_flat and extracted_flat[key] == verified_flat[key])
+    false_positives = sum(1 for key in extracted_flat if key not in verified_flat or extracted_flat[key] != verified_flat[key])
+    false_negatives = sum(1 for key in verified_flat if key not in extracted_flat or extracted_flat[key] != verified_flat[key])
 
-    # 收集所有图片文件和对应的标注文件
-    image_files = []
-    for root, dirs, files in os.walk(data_dir):
-        for file in files:
-            if file.endswith((".jpg", ".jpeg", ".png")):
-                image_path = os.path.join(root, file)
-                annotation_path = os.path.splitext(image_path)[0] + '.txt'
-                if os.path.exists(annotation_path):
-                    image_files.append(image_path)
+    precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
+    recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
+    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
 
-    # 打乱文件顺序
-    random.shuffle(image_files)
+    return precision, recall, f1_score
 
-    # 分割文件列表
-    total_images = len(image_files)
-    train_end = int(total_images * train_ratio)
-    dev_end = train_end + int(total_images * dev_ratio)
-
-    train_files = image_files[:train_end]
-    dev_files = image_files[train_end:dev_end]
-    test_files = image_files[dev_end:]
-
-    # 复制文件到对应目录
-    def copy_files(file_list, target_dir):
-        for image_path in file_list:
-            shutil.copy(image_path, target_dir)
-            annotation_path = os.path.splitext(image_path)[0] + '.txt'
-            shutil.copy(annotation_path, target_dir)
-
-    copy_files(train_files, train_dir)
-    copy_files(dev_files, dev_dir)
-    copy_files(test_files, test_dir)
-
-# 使用示例
-data_directory = '/path/to/your/dataset'  # 替换为你的数据集目录
-output_directory = '/path/to/output'  # 替换为输出文件的保存目录
-split_and_copy_dataset(data_directory, output_directory=output_directory)
+# Example function calls (commented out):
+# extracted_cleaned = clean_data_with_custom_edit_distance(extracted_results, verified_keys)
+# precision, recall, f1_score = calculate_metrics(extracted_cleaned, verified_results)
+# print(f"Precision: {precision}, Recall: {recall}, F1 Score: {f1_score}")
