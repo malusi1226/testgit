@@ -1,20 +1,30 @@
 import os
 import random
+import shutil
 
-def split_dataset(data_dir, train_ratio=0.8, dev_ratio=0.1, output_dir='./'):
+def split_and_copy_dataset(data_dir, train_ratio=0.8, dev_ratio=0.1, output_dir='./'):
     """
-    遍历指定目录，随机划分有标注的图片和对应的标注文件为训练集、验证集和测试集。
+    遍历指定目录，随机划分有标注的图片和对应的标注文件为训练集、验证集和测试集，
+    并将文件复制到对应的目录中。
     
     Args:
     data_dir (str): 包含图片和标注文件的目录。
     train_ratio (float): 分配给训练集的比例。
     dev_ratio (float): 分配给验证集的比例。
-    output_dir (str): 输出文件存放的目录。
+    output_dir (str): 输出文件和目录存放的根目录。
     """
     # 确保比例之和为1
     test_ratio = 1 - (train_ratio + dev_ratio)
     if test_ratio < 0:
         raise ValueError("训练集和验证集的比例总和不能超过1.")
+
+    # 创建训练、验证、测试目录
+    train_dir = os.path.join(output_dir, 'train')
+    dev_dir = os.path.join(output_dir, 'dev')
+    test_dir = os.path.join(output_dir, 'test')
+    os.makedirs(train_dir, exist_ok=True)
+    os.makedirs(dev_dir, exist_ok=True)
+    os.makedirs(test_dir, exist_ok=True)
 
     # 收集所有图片文件和对应的标注文件
     image_files = []
@@ -38,17 +48,18 @@ def split_dataset(data_dir, train_ratio=0.8, dev_ratio=0.1, output_dir='./'):
     dev_files = image_files[train_end:dev_end]
     test_files = image_files[dev_end:]
 
-    # 写入分割后的文件路径到txt文件
-    def write_split_data(file_list, filename):
-        with open(os.path.join(output_dir, filename), 'w') as file:
-            for path in file_list:
-                file.write(path + '\n')
+    # 复制文件到对应目录
+    def copy_files(file_list, target_dir):
+        for image_path in file_list:
+            shutil.copy(image_path, target_dir)
+            annotation_path = os.path.splitext(image_path)[0] + '.txt'
+            shutil.copy(annotation_path, target_dir)
 
-    write_split_data(train_files, 'train.txt')
-    write_split_data(dev_files, 'dev.txt')
-    write_split_data(test_files, 'test.txt')
+    copy_files(train_files, train_dir)
+    copy_files(dev_files, dev_dir)
+    copy_files(test_files, test_dir)
 
 # 使用示例
 data_directory = '/path/to/your/dataset'  # 替换为你的数据集目录
 output_directory = '/path/to/output'  # 替换为输出文件的保存目录
-split_dataset(data_directory, output_directory=output_directory)
+split_and_copy_dataset(data_directory, output_directory=output_directory)
