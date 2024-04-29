@@ -5,7 +5,6 @@ def load_data(extracted, verified):
     """
     return extracted, verified
 
-
 def edit_distance(s1, s2):
     """
     Calculate the Levenshtein distance between two strings.
@@ -24,7 +23,6 @@ def edit_distance(s1, s2):
         distances = new_distances
     return distances[-1]
 
-
 def dynamic_edit_distance_tolerance(length):
     """
     Define the tolerance level for edit distance based on the length of the string.
@@ -36,20 +34,15 @@ def dynamic_edit_distance_tolerance(length):
     else:
         return 3
 
-
-def clean_data_with_custom_edit_distance(extracted, verified_keys_dicts):
+def clean_data_with_custom_edit_distance(extracted, verified_keys):
     """
     Clean the extracted data by matching keys using custom edit distance within a tolerance determined by string length.
-    Assumes verified_keys_dicts is a list of dictionaries with correct keys as values.
     """
-    # Extract keys from dictionaries to a list of strings
-    verified_keys = [list(d.values())[0] for d in verified_keys_dicts]
-
     cleaned_data = []
     for item in extracted:
         key, value = list(item.items())[0]
         key_clean = key.strip().lower()
-
+        
         # Find the best match based on edit distance within the defined tolerance
         best_match = None
         min_distance = float('inf')
@@ -60,16 +53,12 @@ def clean_data_with_custom_edit_distance(extracted, verified_keys_dicts):
             if distance <= tolerance and distance < min_distance:
                 min_distance = distance
                 best_match = verified_key
-
+        
         # Use the best match if found, otherwise use the original key
         corrected_key = best_match if best_match else key
         cleaned_data.append({corrected_key: value})
-
+    
     return cleaned_data
-
-
-
-
 
 def calculate_metrics(extracted, verified):
     """
@@ -79,24 +68,12 @@ def calculate_metrics(extracted, verified):
     extracted_flat = {list(item.keys())[0]: list(item.values())[0] for item in extracted}
     verified_flat = {list(item.keys())[0]: list(item.values())[0] for item in verified}
 
-    true_positives = sum(
-        1 for key in extracted_flat if key in verified_flat and extracted_flat[key] == verified_flat[key])
-    false_positives = sum(
-        1 for key in extracted_flat if key not in verified_flat or extracted_flat[key] != verified_flat[key])
-    false_negatives = sum(
-        1 for key in verified_flat if key not in extracted_flat or extracted_flat[key] != verified_flat[key])
+    true_positives = sum(1 for key in extracted_flat if key in verified_flat and extracted_flat[key] == verified_flat[key])
+    false_positives = sum(1 for key in extracted_flat if key not in verified_flat or extracted_flat[key] != verified_flat[key])
+    false_negatives = sum(1 for key in verified_flat if key not in extracted_flat or extracted_flat[key] != verified_flat[key])
 
     precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
     recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
     f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
 
     return precision, recall, f1_score
-
-
-# Example to prepare your data
-verified_keys_dicts = [{"key": "Monthly"}, {"key": "Settlement Date Basis"}, {"key": "Weekly"}]
-
-extracted_results = [{"key": "Monthly"}, {"key": "Settlement Date Basis"}, {"key": "Weekly"}]
-extracted_cleaned = clean_data_with_custom_edit_distance(extracted_results, verified_keys_dicts)
-precision, recall, f1_score = calculate_metrics(extracted_cleaned, verified_results)
-print(f"Precision: {precision}, Recall: {recall}, F1 Score: {f1_score}")
