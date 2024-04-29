@@ -1,54 +1,68 @@
-from fuzzywuzzy import fuzz
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+def calculate_dynamic_tolerance(key_length, tolerance_ratio=0.2):
+    """ Calculate the dynamic tolerance based on the length of the key and a given tolerance ratio. """
+    return max(1, int(round(key_length * tolerance_ratio)))  # Ensure at least 1 character can be different
 
-def compute_metrics(predictions, truths):
-    # 预处理，将键值对展开为列表
-    pred_keys = [list(d.keys())[0].strip().lower().replace(" ", "") for d in predictions]
-    true_keys = [list(d.keys())[0].strip().lower().replace(" ", "") for d in truths]
-    
-    # 用于跟踪找到的匹配
-    matched_pred_indices = set()
-    matched_true_indices = set()
-    
-    # 初始化标签列表
-    pred_labels = []
-    true_labels = []
+def levenshtein_distance(s1, s2):
+    """Compute the Levenshtein distance between two strings."""
+    if len(s1) > len(s2):
+        s1, s2 = s2, s1
 
-    # 遍历每个预测键，尝试找到匹配的真实键
-    for pred_index, pred_key in enumerate(pred_keys):
-        for true_index, true_key in enumerate(true_keys):
-            if true_index not in matched_true_indices and pred_index not in matched_pred_indices:
-                similarity = fuzz.token_sort_ratio(pred_key, true_key)
-                if similarity >= 80:  # 如果找到合适的匹配
-                    matched_pred_indices.add(pred_index)
-                    matched_true_indices.add(true_index)
-                    pred_labels.append(1)
-                    true_labels.append(1)
+    distances = range(len(s1) + 1)
+    for index2, char2 in enumerate(s2):
+        new_distances = [index2 + 1]
+        for index1, char1 in enumerate(s1):
+            if char1 == char2:
+                new_distances.append(distances[index1])
+            else:
+                new_distances.append(1 + min((distances[index1], distances[index1 + 1], new_distances[-1])))
+        distances = new_distances
+    return distances[-1]
+def calculate_metrics_with_dynamic_tolerance(ocr_results, manual_results, tolerance_ratio=0.2):
+    # Convert list of dictionaries to dictionaries for easier access
+    ocr_dict = {k: v for d in ocr_results for k, v in d.items()}
+    manual_dict = {k.strip(): v for d in manual_results for k, v in d.items()}
+
+    # Variables to hold match details
+    true_positive = 0
+    false_positive = 0
+    false_negative = 0
+    used_keys = set()
+
+    # Check each OCR result against the manual results using edit distance for keys with dynamic tolerance
+    for ocr_key, ocr_value in list(ocr_dict.items()):
+        matched = False
+        for manual_key in manual_dict.keys():
+            if manual_key not in used_keys:
+                calculated_tolerance = calculate_dynamic_tolerance(len(manual_key), tolerance_ratio)
+                if levenshtein_distance(ocr_key, manual_key) <= calculated_tolerance:
+                    # Compare values if keys are considered matching
+                    if ocr_value == manual_dict[manual_key]:
+                        true_positive += 1
+                    else:
+                        false_positive += 1
+                    used_keys.add(manual_key)
+                    matched = True
                     break
+        if not matched:
+            false_positive += 1
 
-    # 处理未匹配的预测键和真实键
-    for index in range(len(pred_keys)):
-        if index not in matched_pred_indices:
-            pred_labels.append(0)
+    # Remaining entries in manual_dict that were not used are false negatives
+    false_negative = len(manual_dict) - len(used_keys)
 
-    for index in range(len(true_keys)):
-        if index not in matched_true_indices:
-            true_labels.append(0)
+    # Calculate precision, recall, and F1 score
+    precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) > 0 else 0
+    recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) > 0 else 0
+    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
 
-    # 计算准确率、召回率、F1分数
-    accuracy = accuracy_score(true_labels, pred_labels)
-    precision = precision_score(true_labels, pred_labels)
-    recall = recall_score(true_labels, pred_labels)
-    f1 = f1_score(true_labels, pred_labels)
-
-    return accuracy, precision, recall, f1
-
-# 示例数据
-ocr_results = [{" Key": "value"}, {" Key": "value"}, {" Extra Key": "not needed"}]
-manual_results = [{" Key": "value"}, {" Key": "value"}]
-
-accuracy, precision, recall, f1 = compute_metrics(ocr_results, manual_results)
-print(f"Accuracy: {accuracy:.2f}")
-print(f"Precision: {precision:.2f}")
-print(f"Recall: {recall:.2f}")
-print(f"F1 Score: {f1:.2f}")
+    return {
+        "accuracy": true_positive / (true_positive + false_positive + false_negative) if (
+                                                                                                 true_positive + false_positive + false_negative) > 0 else 0,
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1_score
+    }
+ocr_results = [{"yes": "blank"}, {"no12345678": "blank"}]
+manual_results = [{"yes": "blank"}, {"no1234567891": "blank"}, {"other": "blank"}]
+# Uncomment the line below to calculate the metrics when ready
+a =  calculate_metrics_with_dynamic_tolerance(ocr_results, manual_results)
+print(a)
