@@ -1,27 +1,58 @@
-import os
+def calculate_metrics_with_dynamic_tolerance(ocr_results, manual_results, tolerance_ratio=0.2):
+    # Convert list of dictionaries to dictionaries for easier access
+    ocr_dict = {k: v for d in ocr_results for k, v in d.items()}
+    manual_dict = {}
+    for d in manual_results:
+        for k, v in d.items():
+            k = k.strip()
+            if k in manual_dict:
+                manual_dict[k].append(v)  # Append value to list if key already exists
+            else:
+                manual_dict[k] = [v]  # Create new list for new keys
 
-# 要检查的文件列表
-files_to_check = ['train.txt', 'test.txt', 'dev.txt']
+    # Variables to hold match details
+    true_positive = 0
+    false_positive = 0
+    false_negative = 0
 
-# 遍历每个文件
-for file_path in files_to_check:
-    # 读取原始数据
-    with open(file_path, 'r') as file:
-        lines = file.readlines()
-    
-    # 创建一个列表来保存有效的行
-    updated_lines = []
+    # Check each OCR result against the manual results using edit distance for keys with dynamic tolerance
+    for ocr_key, ocr_value in list(ocr_dict.items()):
+        matched = False
+        for manual_key, values in manual_dict.items():
+            calculated_tolerance = calculate_dynamic_tolerance(len(manual_key), tolerance_ratio)
+            if levenshtein_distance(ocr_key, manual_key) <= calculated_tolerance:
+                # Check each value for the current key in manual results
+                for i in range(len(values)):
+                    if values[i] is not None:  # Check if the value has not been matched yet
+                        if ocr_value == values[i]:
+                            true_positive += 1
+                        else:
+                            false_positive += 1
+                        values[i] = None  # Mark this value as matched
+                        matched = True
+                        break
+                if matched:
+                    break
+        if not matched:
+            false_positive += 1
 
-    # 检查每一行的图片是否有对应的标签文件
-    for line in lines:
-        # 假设路径的前缀和图像与标签的存储方式
-        image_path = line.strip()
-        label_path = image_path.replace('.jpg', '.txt').replace('.png', '.txt')
-        
-        # 检查标签文件是否存在
-        if os.path.exists(label_path):
-            updated_lines.append(line)
+    # Remaining unmatched entries in manual_dict are false negatives
+    for values in manual_dict.values():
+        for value in values:
+            if value is not None:
+                false_negative += 1
 
-    # 将更新后的行写回到文件
-    with open(file_path, 'w') as file:
-        file.writelines(updated_lines)
+    # Calculate precision, recall, and F1 score
+    precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) > 0 else 0
+    recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) > 0 else 0
+    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+    return {
+        "accuracy": true_positive / (true_positive + false_positive + false_negative) if (
+                                                                                                 true_positive + false_positive + false_negative) > 0 else 0,
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1_score
+    }
+
+# 你可以用这段代码来替换你现有的计算函数，它将更准确地处理manual_results中key的重复问题。
