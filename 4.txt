@@ -2,13 +2,16 @@ def calculate_metrics_with_dynamic_tolerance(ocr_results, manual_results, tolera
     # Convert list of dictionaries to dictionaries for easier access
     ocr_dict = {k: v for d in ocr_results for k, v in d.items()}
     manual_dict = {}
+    key_usage_counts = {}  # Dictionary to track how many times each key has been matched
+
     for d in manual_results:
         for k, v in d.items():
             k = k.strip()
             if k in manual_dict:
-                manual_dict[k].append(v)  # Append value to list if key already exists
+                manual_dict[k].append(v)
             else:
-                manual_dict[k] = [v]  # Create new list for new keys
+                manual_dict[k] = [v]
+            key_usage_counts[k] = 0  # Initialize key usage count
 
     # Variables to hold match details
     true_positive = 0
@@ -23,12 +26,13 @@ def calculate_metrics_with_dynamic_tolerance(ocr_results, manual_results, tolera
             if levenshtein_distance(ocr_key, manual_key) <= calculated_tolerance:
                 # Check each value for the current key in manual results
                 for i in range(len(values)):
-                    if values[i] is not None:  # Check if the value has not been matched yet
+                    if values[i] is not None and key_usage_counts[manual_key] < len(values):  # Ensure key is not overused
                         if ocr_value == values[i]:
                             true_positive += 1
                         else:
                             false_positive += 1
                         values[i] = None  # Mark this value as matched
+                        key_usage_counts[manual_key] += 1  # Increment usage count
                         matched = True
                         break
                 if matched:
@@ -37,7 +41,7 @@ def calculate_metrics_with_dynamic_tolerance(ocr_results, manual_results, tolera
             false_positive += 1
 
     # Remaining unmatched entries in manual_dict are false negatives
-    for values in manual_dict.values():
+    for key, values in manual_dict.items():
         for value in values:
             if value is not None:
                 false_negative += 1
@@ -52,7 +56,8 @@ def calculate_metrics_with_dynamic_tolerance(ocr_results, manual_results, tolera
                                                                                                  true_positive + false_positive + false_negative) > 0 else 0,
         "precision": precision,
         "recall": recall,
-        "f1_score": f1_score
+        "f1_score": f1_score,
+        "key_usage_counts": key_usage_counts  # Optionally return usage counts for debugging or further analysis
     }
 
-# 你可以用这段代码来替换你现有的计算函数，它将更准确地处理manual_results中key的重复问题。
+# 使用这个函数将确保每个manual key的使用不会超过其在数据集中出现的次数。
