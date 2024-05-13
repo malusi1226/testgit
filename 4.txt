@@ -1,23 +1,19 @@
 import cv2
 import pytesseract
-from pytesseract import Output
 
-def detect_chars_and_draw_boxes(image_path, output_path):
-    # 读取图像
+def detect_words_and_draw_boxes(image_path, output_path):
     image = cv2.imread(image_path)
-    # 将图像转换为 RGB 格式
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    # 使用 pytesseract 的 image_to_boxes 函数
-    boxes = pytesseract.image_to_boxes(rgb_image)
+    # 设置 Tesseract 的 PSM 模式为 8
+    custom_config = r'--oem 3 --psm 8'
+    boxes = pytesseract.image_to_boxes(rgb_image, config=custom_config)
 
-    # 对返回的每个字符的边框进行解析和绘制
+    # 转换坐标和绘制边框
+    h, w, _ = image.shape
     for b in boxes.splitlines():
         b = b.split(' ')
-        char = b[0]
         x, y, x2, y2 = int(b[1]), int(b[2]), int(b[3]), int(b[4])
-        # Tesseract 的坐标需要转换，因为它的 y 坐标是从底部开始的
-        h, w, _ = image.shape
         cv2.rectangle(image, (x, h - y), (x2, h - y2), (0, 255, 0), 2)
 
     # 保存图像到文件
@@ -28,4 +24,4 @@ image_path = 'path_to_your_image.jpg'  # 输入图像路径
 output_path = 'output_image.jpg'  # 输出图像路径
 
 # 调用函数
-detect_chars_and_draw_boxes(image_path, output_path)
+detect_words_and_draw_boxes(image_path, output_path)
