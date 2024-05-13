@@ -1,56 +1,31 @@
 import cv2
-import numpy as np
+from PIL import Image
+import pytesseract
+from pytesseract import Output
 
+# 需要指定 tesseract 的安装路径，如果你的 tesseract 在 Linux 系统的标准路径下，可以注释掉这行代码
+# pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
-def visualize_horizontal_projection(image_path, ocr_boxes, blank_threshold):
+def detect_text_and_draw_boxes(image_path, output_path):
+    # 加载图像
     image = cv2.imread(image_path)
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # 将图像转换为 RGB，因为 pytesseract 需要 RGB 图像
+    rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    for box in ocr_boxes:
-        x_min = int(min(box, key=lambda b: b[0])[0])
-        y_min = int(min(box, key=lambda b: b[1])[1])
-        x_max = int(max(box, key=lambda b: b[0])[0])
-        y_max = int(max(box, key=lambda b: b[1])[1])
+    # 使用 pytesseract 进行字符检测，获取每个字符的详细信息
+    details = pytesseract.image_to_data(rgb_image, output_type=Output.DICT)
 
-        cropped = gray[y_min:y_max, x_min:x_max]
-        _, binary_cropped = cv2.threshold(cropped, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    # 在图像上绘制每个检测到的字符的边框
+    n_boxes = len(details['text'])
+    for i in range(n_boxes):
+        if int(details['conf'][i]) > 60:  # 置信度阈值
+            (x, y, w, h) = (details['left'][i], details['top'][i], details['width'][i], details['height'][i])
+            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-        # 垂直投影
-        vertical_projection = np.sum(binary_cropped == 255, axis=0)
-        projection_normalized = (vertical_projection * (y_max - y_min) / vertical_projection.max()).astype(np.uint32)
+    # 保存结果图像
+    cv2.imwrite(output_path, image)
 
-        # 标记空白区域
-        blank_regions = []
-        in_blank = False
-        start = 0
-
-        for i, count in enumerate(projection_normalized):
-            if count < blank_threshold and not in_blank:
-                in_blank = True
-                start = i
-            elif count >= blank_threshold and in_blank:
-                if i - start > 1:  # 至少1像素宽的空白
-                    blank_regions.append((x_min + start, x_min + i))
-                in_blank = False
-
-        # 在原始图像上绘制结果
-        for start, end in blank_regions:
-            cv2.rectangle(image, (start, y_min), (end, y_max), (0, 255, 0), 2)
-
-        # 绘制文本框
-        points = np.array(box, np.int32).reshape((-1, 1, 2))
-        cv2.polylines(image, [points], isClosed=True, color=(255, 0, 0), thickness=2)
-
-    return image
-
-ocr_boxes = [
-    [[165.0, 43.8], [433.8, 42.0], [433.8, 58.8], [165.8, 59.0]],
-    [[65.8, 66.8], [216.8, 66.8], [216.8, 83.8], [65.0, 83.8]],
-    # 更多边界框...
-]
-# Example usage:
-image_path = '2.png'
-modified_image = visualize_horizontal_projection(image_path, ocr_boxes, blank_threshold=20)
-cv2.imshow("Projection Visualization", modified_image)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+# 调用函数
+image_path = 'path_to_your_image.jpg'  # 将这里替换为你的图像路径
+output_path = 'output_image.jpg'  # 输出图像的保存路径
+detect_text_and_draw_boxes(image_path, output_path)
