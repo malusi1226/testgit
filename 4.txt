@@ -3,32 +3,19 @@ import numpy as np
 
 # 假设有一个从OCR返回的结果列表
 ocr_results = [
-    [[165.0, 43.8], [433.8, 42.0], [433.8, 58.8], [165.8, 59.0],
-     ('SECTION E -METHOD FOR RECEIVING REPORTS FROM HSBC', 8.936)],
+    [[165.0, 43.8], [433.8, 42.0], [433.8, 58.8], [165.8, 59.0], ('SECTION E -METHOD FOR RECEIVING REPORTS FROM HSBC', 8.936)],
     [[65.8, 66.8], [216.8, 66.8], [216.8, 83.8], [65.0, 83.8], ('E2 Corporate Action Reporting', 0.978)],
     # 添加更多数据...
 ]
 
-
 def extract_words_from_box(image, box, threshold_ratio=0.25):
-    """
-    根据给定的边界框从图像中提取单词
-    :param image: 原始图像
-    :param box: 边界框坐标，形式为[[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
-    :param threshold_ratio: 空白阈值比例，用于决定何处分割
-    :return: 单词边界列表
-    """
-    # 转换坐标为适合cv2.boundingRect的形式
-    rect = cv2.boundingRect(np.array(box)[:, :2].astype(int))
+    """ 提取并返回单词的边界框列表 """
+    rect = cv2.boundingRect(np.array(box)[:,:2].astype(int))
     x, y, w, h = rect
-    # 提取子图像
-    sub_img = image[y:y + h, x:x + w]
-    # 转为灰度并二值化
+    sub_img = image[y:y+h, x:x+w]
     gray = cv2.cvtColor(sub_img, cv2.COLOR_BGR2GRAY)
     _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    # 计算水平投影
     horizontal_projection = np.sum(binary, axis=0)
-    # 根据水平投影分割单词
     is_space = horizontal_projection < (np.max(horizontal_projection) * threshold_ratio)
     changes = np.diff(is_space.astype(int))
     word_starts = np.where(changes == 1)[0]
@@ -38,22 +25,28 @@ def extract_words_from_box(image, box, threshold_ratio=0.25):
     if word_ends.size > 0 and word_ends[-1] < word_starts[-1]:
         word_ends = np.append(word_ends, binary.shape[1])
     word_bounds = list(zip(word_starts, word_ends))
-
     return [(x + start, y, x + end, y + h) for start, end in word_bounds]
 
+def process_ocr_results(image, ocr_results, threshold_ratio):
+    """ 处理OCR结果，分割单词，并在原图上画框 """
+    for result in ocr_results:
+        box = result[:-1]
+        words = extract_words_from_box(image, box, threshold_ratio)
+        for (x1, y1, x2, y2) in words:
+            # 在原图上绘制边界框
+            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+    return image
 
 # 加载图像
-image = cv2.imread(r'C:\Users\malusi\Desktop\2.png')
+image_path = './2.png'
+image = cv2.imread(image_path)
 
-# 遍历OCR结果，处理每个边界框
-for result in ocr_results:
-    box = result[:-1]
-    words = extract_words_from_box(image, box)
-    for word in words:
-        cv2.rectangle(image, (word[0], word[1]), (word[2], word[3]), (0, 255, 0), 1)
+# 设置阈值比例并处理图像
+threshold_ratio = 0.25  # 这是可调整的阈值
+processed_image = process_ocr_results(image, ocr_results, threshold_ratio)
 
-# 显示处理后的图像
-cv2.imshow("Words Extracted", image)
+# 显示和保存结果
+cv2.imshow("Processed Image", processed_image)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
-
+cv2.imwrite("output_with_words.jpg", processed_image)
