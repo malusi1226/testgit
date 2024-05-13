@@ -1,71 +1,56 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 
 
-def extract_words_from_projection(image, box, space_threshold, blockSize=11, C=2):
-    """ 使用水平投影从特定边界框中提取单词，基于空白间隔 """
-    rect = cv2.boundingRect(np.array(box)[:, :2].astype(int))
-    x, y, w, h = rect
-    sub_img = image[y:y + h, x:x + w]
+def visualize_horizontal_projection(image_path, ocr_boxes, blank_threshold):
+    image = cv2.imread(image_path)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # 转为灰度并应用自适应阈值二值化
-    gray = cv2.cvtColor(sub_img, cv2.COLOR_BGR2GRAY)
-    binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, blockSize, C)
+    for box in ocr_boxes:
+        x_min = int(min(box, key=lambda b: b[0])[0])
+        y_min = int(min(box, key=lambda b: b[1])[1])
+        x_max = int(max(box, key=lambda b: b[0])[0])
+        y_max = int(max(box, key=lambda b: b[1])[1])
 
-    # 计算水平投影
-    horizontal_projection = np.sum(binary, axis=0)
+        cropped = gray[y_min:y_max, x_min:x_max]
+        _, binary_cropped = cv2.threshold(cropped, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
-    # 可视化水平投影
-    plt.figure()
-    plt.plot(horizontal_projection)
-    plt.title('Horizontal Projection')
-    plt.show()
+        # 垂直投影
+        vertical_projection = np.sum(binary_cropped == 255, axis=0)
+        projection_normalized = (vertical_projection * (y_max - y_min) / vertical_projection.max()).astype(np.uint32)
 
-    # 寻找空白间隔来分割单词
-    spaces = np.where(horizontal_projection == 0)[0]
-    words = []
-    last_pos = 0
-    if len(spaces) > 0:
-        for i in range(1, len(spaces)):
-            if spaces[i] - spaces[i - 1] > space_threshold:
-                words.append((last_pos, spaces[i - 1]))
-                last_pos = spaces[i]
-        words.append((last_pos, w))  # 添加最后一个单词
+        # 标记空白区域
+        blank_regions = []
+        in_blank = False
+        start = 0
 
-    # 处理没有空白的情况
-    if not words:
-        words.append((0, w))
+        for i, count in enumerate(projection_normalized):
+            if count < blank_threshold and not in_blank:
+                in_blank = True
+                start = i
+            elif count >= blank_threshold and in_blank:
+                if i - start > 1:  # 至少1像素宽的空白
+                    blank_regions.append((x_min + start, x_min + i))
+                in_blank = False
 
-    word_images = []
-    for start, end in words:
-        word_img = sub_img[:, start:end]
-        word_images.append(word_img)
-        cv2.rectangle(sub_img, (start, 0), (end, h), (0, 255, 0), 2)  # 在原图上画出单词边界
+        # 在原始图像上绘制结果
+        for start, end in blank_regions:
+            cv2.rectangle(image, (start, y_min), (end, y_max), (0, 255, 0), 2)
 
-    return sub_img, word_images
+        # 绘制文本框
+        points = np.array(box, np.int32).reshape((-1, 1, 2))
+        cv2.polylines(image, [points], isClosed=True, color=(255, 0, 0), thickness=2)
 
+    return image
 
-# 加载图像
-image_path = '2.png'
-image = cv2.imread(image_path)
-
-# OCR返回的边界框
 ocr_boxes = [
     [[165.0, 43.8], [433.8, 42.0], [433.8, 58.8], [165.8, 59.0]],
     [[65.8, 66.8], [216.8, 66.8], [216.8, 83.8], [65.0, 83.8]],
     # 更多边界框...
 ]
-
-# 设置空白间隔阈值
-space_threshold = 20  # 这个阈值可以根据实际情况调整
-
-# 处理每个OCR结果
-for box in ocr_boxes:
-    processed_image, word_images = extract_words_from_projection(image, box, space_threshold)
-    cv2.imshow("Processed Image", processed_image)
-    for word_image in word_images:
-        cv2.imshow("Word", word_image)
-    cv2.waitKey(0)
-
+# Example usage:
+image_path = '2.png'
+modified_image = visualize_horizontal_projection(image_path, ocr_boxes, blank_threshold=20)
+cv2.imshow("Projection Visualization", modified_image)
+cv2.waitKey(0)
 cv2.destroyAllWindows()
