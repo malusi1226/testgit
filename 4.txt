@@ -1,52 +1,44 @@
 import cv2
 import numpy as np
 
-# 假设有一个从OCR返回的结果列表
+# 假设OCR结果以这种格式返回：每个条目包括边界框坐标和对应的文本
 ocr_results = [
     [[165.0, 43.8], [433.8, 42.0], [433.8, 58.8], [165.8, 59.0], ('SECTION E -METHOD FOR RECEIVING REPORTS FROM HSBC', 8.936)],
     [[65.8, 66.8], [216.8, 66.8], [216.8, 83.8], [65.0, 83.8], ('E2 Corporate Action Reporting', 0.978)],
-    # 添加更多数据...
+    # 更多条目...
 ]
 
-def extract_words_from_box(image, box, threshold_ratio=0.25):
-    """ 提取并返回单词的边界框列表 """
+def extract_words_using_cca(image, box):
+    """ 使用连通区域分析从特定边界框中提取单词 """
+    # 转换坐标为适合cv2.boundingRect的形式，并裁剪图像
     rect = cv2.boundingRect(np.array(box)[:,:2].astype(int))
     x, y, w, h = rect
     sub_img = image[y:y+h, x:x+w]
+
+    # 转为灰度并二值化
     gray = cv2.cvtColor(sub_img, cv2.COLOR_BGR2GRAY)
     _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    horizontal_projection = np.sum(binary, axis=0)
-    is_space = horizontal_projection < (np.max(horizontal_projection) * threshold_ratio)
-    changes = np.diff(is_space.astype(int))
-    word_starts = np.where(changes == 1)[0]
-    word_ends = np.where(changes == -1)[0]
-    if word_starts.size > 0 and word_starts[0] > word_ends[0]:
-        word_starts = np.insert(word_starts, 0, 0)
-    if word_ends.size > 0 and word_ends[-1] < word_starts[-1]:
-        word_ends = np.append(word_ends, binary.shape[1])
-    word_bounds = list(zip(word_starts, word_ends))
-    return [(x + start, y, x + end, y + h) for start, end in word_bounds]
 
-def process_ocr_results(image, ocr_results, threshold_ratio):
-    """ 处理OCR结果，分割单词，并在原图上画框 """
-    for result in ocr_results:
-        box = result[:-1]
-        words = extract_words_from_box(image, box, threshold_ratio)
-        for (x1, y1, x2, y2) in words:
-            # 在原图上绘制边界框
-            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-    return image
+    # 应用连通区域分析
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary, connectivity=8, ltype=cv2.CV_32S)
+
+    # 绘制每个连通区域并返回结果
+    for i in range(1, num_labels):  # 0是背景
+        x_stat, y_stat, w_stat, h_stat, area = stats[i]
+        if area > 50:  # 忽略太小的区域
+            cv2.rectangle(sub_img, (x_stat, y_stat), (x_stat+w_stat, y_stat+h_stat), (0, 255, 0), 2)
+
+    return sub_img
 
 # 加载图像
-image_path = './2.png'
+image_path = '2.png'
 image = cv2.imread(image_path)
 
-# 设置阈值比例并处理图像
-threshold_ratio = 0.25  # 这是可调整的阈值
-processed_image = process_ocr_results(image, ocr_results, threshold_ratio)
+# 处理每个OCR结果
+for result in ocr_results:
+    box = result[:-1]
+    processed_sub_image = extract_words_using_cca(image, box)
+    cv2.imshow("Words Extracted using CCA", processed_sub_image)
+    cv2.waitKey(0)
 
-# 显示和保存结果
-cv2.imshow("Processed Image", processed_image)
-cv2.waitKey(0)
 cv2.destroyAllWindows()
-cv2.imwrite("output_with_words.jpg", processed_image)
