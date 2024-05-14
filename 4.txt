@@ -1,1 +1,62 @@
 
+import paddleocr
+import cv2
+import numpy as np
+from sklearn.cluster import DBSCAN
+import matplotlib.pyplot as plt
+
+def segment_characters(word_image):
+    gray = cv2.cvtColor(word_image, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    char_bboxes = [cv2.boundingRect(c) for c in contours]
+    char_bboxes = sorted(char_bboxes, key=lambda x: x[0])
+    return char_bboxes
+
+def cluster_characters(chars):
+    X = np.array([[(box[0] + box[2]) / 2, (box[1] + box[3]) / 2] for box in chars])
+    clustering = DBSCAN(eps=20, min_samples=1).fit(X)
+    clusters = {}
+    for i, label in enumerate(clustering.labels_):
+        if label not in clusters:
+            clusters[label] = []
+        clusters[label].append(chars[i])
+    return clusters.values()
+
+def draw_word_boxes(image_path, output_path):
+    # 创建 PaddleOCR 阅读器
+    ocr = paddleocr.OCR(use_angle_cls=True, lang='ch')
+
+    # 读取图像
+    image = cv2.imread(image_path)
+
+    # 进行 OCR 检测
+    results = ocr.ocr(image_path, cls=True)
+
+    for result in results:
+        for line in result:
+            bbox = line[0]
+            top_left = tuple(map(int, bbox[0]))
+            bottom_right = tuple(map(int, bbox[2]))
+
+            line_image = image[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
+            char_bboxes = segment_characters(line_image)
+            word_bboxes = cluster_characters(char_bboxes)
+
+            for word in word_bboxes:
+                x_min = min([box[0] for box in word])
+                y_min = min([box[1] for box in word])
+                x_max = max([box[0] + box[2] for box in word])
+                y_max = max([box[1] + box[3] for box in word])
+                word_top_left = (top_left[0] + x_min, top_left[1] + y_min)
+                word_bottom_right = (top_left[0] + x_max, top_left[1] + y_max)
+                cv2.rectangle(image, word_top_left, word_bottom_right, (0, 0, 255), 2)  # 红色边框
+
+    # 保存结果图像
+    cv2.imwrite(output_path, image)
+    print(f"Result image saved to {output_path}")
+
+# 调用函数，输入图片路径和保存路径
+image_path = 'your_image_path.jpg'
+output_path = 'output_image.jpg'
+draw_word_boxes(image_path, output_path)
