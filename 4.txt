@@ -33,33 +33,20 @@ def paddleocr_to_tesseract(image_path):
         # 裁剪文本框区域
         line_image = image[y_min:y_max, x_min:x_max]
 
-        # 转换为灰度图像并进行二值化
-        gray = cv2.cvtColor(line_image, cv2.COLOR_BGR2GRAY)
-        _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        # 转换为 PIL 图像以供 Tesseract 识别
+        line_image_pil = Image.fromarray(cv2.cvtColor(line_image, cv2.COLOR_BGR2RGB))
 
-        # 通过形态学操作去除噪声
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 2))
-        binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+        # 使用 Tesseract 对整行进行单词级别的识别
+        custom_config = r'--oem 1 --psm 6'  # 使用 LSTM 引擎，假设一个单独的统一文本块
+        d = pytesseract.image_to_data(line_image_pil, config=custom_config, output_type=pytesseract.Output.DICT)
 
-        # 识别每个字符的轮廓
-        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for contour in contours:
-            x, y, w, h = cv2.boundingRect(contour)
-            if w > 5 and h > 5:  # 过滤掉噪声
-                char_image = line_image[y:y+h, x:x+w]
-
-                # 转换为 PIL 图像以供 Tesseract 识别
-                char_image_pil = Image.fromarray(cv2.cvtColor(char_image, cv2.COLOR_BGR2RGB))
-
-                # 使用 Tesseract 识别字符
-                char_text = pytesseract.image_to_string(char_image_pil, config='--oem 1 --psm 10').strip()
-                
-                if char_text:
-                    print(f"Character recognized by Tesseract: {char_text}")
-
+        n_boxes = len(d['level'])
+        for i in range(n_boxes):
+            (x, y, w, h) = (d['left'][i], d['top'][i], d['width'][i], d['height'][i])
+            if d['text'][i].strip():
+                print(f"Word recognized by Tesseract: {d['text'][i]}")
                 # 绘制蓝色边框
                 cv2.rectangle(image, (x_min + x, y_min + y), (x_min + x + w, y_min + y + h), (255, 0, 0), 2)
-                cv2.putText(image, char_text, (x_min + x, y_min + y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
     # 显示结果图像
     plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
