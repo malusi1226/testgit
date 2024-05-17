@@ -1,1 +1,73 @@
 
+import cv2
+import numpy as np
+from paddleocr import PaddleOCR
+
+# 初始化 PaddleOCR
+ocr = PaddleOCR(use_angle_cls=True, lang='ch')
+
+# 设置阈值（像素）
+threshold = 0.5
+
+
+def find_blank_areas_within_boxes(image_path):
+    # 加载图像
+    image = cv2.imread(image_path)
+    if image is None:
+        raise ValueError(f"Image at path {image_path} could not be loaded.")
+
+    # 使用 PaddleOCR 识别图像中的文本
+    ocr_result = ocr.ocr(image_path, cls=True)
+
+    # 提取 OCR 结果中的位置信息
+    boxes = [line[0] for line in ocr_result[0]]
+
+    # 遍历每个文本区域
+    for box in boxes:
+        x_min = int(min([point[0] for point in box]))
+        y_min = int(min([point[1] for point in box]))
+        x_max = int(max([point[0] for point in box]))
+        y_max = int(max([point[1] for point in box]))
+
+        # 提取文本区域内的图像
+        text_area = image[y_min:y_max, x_min:x_max]
+
+        # 转换为灰度图
+        gray = cv2.cvtColor(text_area, cv2.COLOR_BGR2GRAY)
+
+        # 二值化
+        _, binary = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
+
+        # 检测空白区域
+        blank_regions = []
+        start = 0
+        in_blank = False
+        for i, val in enumerate(np.sum(binary, axis=0)):
+            if val == 0 and not in_blank:
+                start = i
+                in_blank = True
+            elif val != 0 and in_blank:
+                end = i
+                if end - start > threshold:
+                    blank_regions.append((start, end))
+                in_blank = False
+
+        # 绘制空白区域
+        for start, end in blank_regions:
+            cv2.rectangle(text_area, (start, 0), (end, y_max - y_min), (255, 0, 0), 2)
+
+        # 绘制OCR结果
+        cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (0, 0, 255), 2)
+
+        # 将处理后的文本区域重新放回原图
+        image[y_min:y_max, x_min:x_max] = text_area
+
+    # 显示或保存结果图像
+    output_path = "output_with_internal_blank_areas.jpg"
+    cv2.imwrite(output_path, image)
+    print(f"Output saved to {output_path}")
+
+
+# 示例调用
+# find_blank_areas_within_boxes("1.png")
+find_blank_areas_within_boxes("3.jpg")
