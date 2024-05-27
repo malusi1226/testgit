@@ -1,1 +1,54 @@
 
+import fitz
+import re
+
+def pdf_to_text(pdf_path):
+    doc = fitz.open(pdf_path)
+    text = ''
+    for page_num in range(len(doc)):
+        page = doc.load_page(page_num)
+        text += page.get_text("text") + '\n'
+    return text
+
+def clean_text(text):
+    url_pattern = re.compile(r'(https?://\S+|www\.\S+)')
+    lines = text.split('\n')
+    cleaned_lines = []
+    buffer = ''
+
+    for line in lines:
+        if url_pattern.search(line):
+            # 如果缓冲区中有数据，将缓冲区内容添加到清理后的行
+            if buffer:
+                cleaned_lines.append(buffer)
+                buffer = ''
+            # 直接添加包含URL的行
+            cleaned_lines.append(line)
+        else:
+            # 非URL行添加到缓冲区
+            if buffer:
+                buffer += ' ' + line
+            else:
+                buffer = line
+
+    # 处理最后剩余的缓冲区内容
+    if buffer:
+        cleaned_lines.append(buffer)
+
+    cleaned_text = '\n'.join(cleaned_lines)
+    return cleaned_text
+
+def save_text_to_file(text, output_path):
+    with open(output_path, 'w', encoding='utf-8') as file:
+        file.write(text)
+
+def process_pdf(pdf_path, output_path):
+    # 步骤1: 将PDF转换为文本
+    text = pdf_to_text(pdf_path)
+    # 步骤2: 清理文本中的换行符
+    cleaned_text = clean_text(text)
+    # 步骤3: 将清理后的文本保存到新文件中
+    save_text_to_file(cleaned_text, output_path)
+
+# 示例调用
+# process_pdf('input.pdf', 'output.txt')
