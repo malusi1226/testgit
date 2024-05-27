@@ -2,19 +2,22 @@ def correct_line_breaks(text):
     lines = text.split('\n')
     corrected_lines = []
     combined_line = ""
+    
     url_pattern = re.compile(r'^https?://')
-    tag_start_pattern = re.compile(r'^<[^>]+$')
+    tag_start_pattern = re.compile(r'^<[^>]+>$')
     tag_end_pattern = re.compile(r'.+>$')
-
+    
     for line in lines:
         stripped_line = line.strip()
         
-        # If the current line starts with a URL or a tag, combine it with the previous line
-        if url_pattern.match(stripped_line) or tag_start_pattern.match(stripped_line):
+        # If the current line starts with a URL, combine it with the previous line
+        if url_pattern.match(stripped_line):
+            combined_line += stripped_line
+        elif tag_start_pattern.match(stripped_line):
             combined_line += stripped_line
         else:
             # If the previous combined line ends with a tag, just add the current line
-            if tag_end_pattern.match(combined_line):
+            if combined_line and (tag_end_pattern.match(combined_line) or url_pattern.match(combined_line)):
                 combined_line += stripped_line
             else:
                 # Otherwise, save the combined line and reset for the next block
