@@ -1,33 +1,25 @@
-def correct_line_breaks(text):
-    lines = text.split('\n')
-    combined_line = ""
-    corrected_lines = []
+def get_local_pdf(pdf_path):
+    doc = fitz.open(pdf_path)
+    # 合并PDF文档的所有页面文本
+    full_text = ""
+    pages_text = {}
+    
+    for page_num in range(len(doc)):
+        page = doc.load_page(page_num)
+        blocks = page.get_text("dict")["blocks"]
+        page_text = ""
 
-    # 定义关键字和文件扩展名
-    key_fragments = re.compile(r'(https?|ftp|file)://|\.com|\.org|\.net|\.html|\.pdf|\.xls|\.xlsx|\.mp3|\.docx|%[0-9A-Fa-f]{2}|servicenow|confluence|\+|id=')
-
-    for line in lines:
-        stripped_line = line.strip()
-
-        if combined_line:
-            # 检查当前行是否是前一行的延续
-            if key_fragments.search(combined_line) or key_fragments.search(stripped_line) or (combined_line[-1].isalnum() and stripped_line[0].isalnum()):
-                combined_line += stripped_line
-            else:
-                corrected_lines.append(combined_line)
-                combined_line = stripped_line
-        else:
-            combined_line = stripped_line
-
-    if combined_line:
-        corrected_lines.append(combined_line)
-
-    # 确保在需要的地方添加换行符
-    formatted_text = '\n'.join(corrected_lines)
-    formatted_text = formatted_text.replace('. ', '.\n')
-    formatted_text = formatted_text.replace('):', '):\n')
-    formatted_text = formatted_text.replace(')\n', ')\n\n')
-    formatted_text = re.sub(r'(\d\.\s)', r'\n\1', formatted_text)
-    formatted_text = re.sub(r'(\w)-\n(\w)', r'\1-\2', formatted_text)  # 合并被拆分的单词
-
-    return formatted_text
+        for block in blocks:
+            # 如果是文本块
+            if "lines" in block:
+                for line in block["lines"]:
+                    for span in line["spans"]:
+                        page_text += span["text"]
+            # 如果是图片块
+            elif "image" in block:
+                page_text += "[png]"
+        
+        full_text += page_text + "\n"  # 添加换行符作为页面间的分隔
+        pages_text[page_num] = page_text
+    
+    return full_text, pages_text
