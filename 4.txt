@@ -11,7 +11,7 @@ def correct_line_breaks(text):
 
         if combined_line:
             # 检查当前行是否是前一行的延续
-            if key_fragments.search(stripped_line) or (combined_line[-1].isalnum() and stripped_line[0].isalnum()):
+            if key_fragments.search(stripped_line) or (combined_line and combined_line[-1].isalnum() and stripped_line and stripped_line[0].isalnum()):
                 combined_line += stripped_line
             else:
                 corrected_lines.append(combined_line)
