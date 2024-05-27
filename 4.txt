@@ -1,31 +1,25 @@
+
 def correct_line_breaks(text):
     lines = text.split('\n')
-    corrected_lines = []
     combined_line = ""
-    
-    url_pattern = re.compile(r'^https?://')
-    tag_start_pattern = re.compile(r'^<[^>]+>$')
-    tag_end_pattern = re.compile(r'.+>$')
-    
+    corrected_lines = []
+
+    # 定义关键字和文件扩展名
+    key_fragments = re.compile(r'(https?|ftp|file)://|\.com|\.org|\.net|\.html|\.pdf|\.xls|\.xlsx|\.mp3|%[0-9A-Fa-f]{2}')
+
     for line in lines:
         stripped_line = line.strip()
-        
-        # If the current line starts with a URL, combine it with the previous line
-        if url_pattern.match(stripped_line):
-            combined_line += stripped_line
-        elif tag_start_pattern.match(stripped_line):
-            combined_line += stripped_line
-        else:
-            # If the previous combined line ends with a tag, just add the current line
-            if combined_line and (tag_end_pattern.match(combined_line) or url_pattern.match(combined_line)):
+
+        if combined_line:
+            # 检查当前行是否是前一行的延续
+            if key_fragments.search(stripped_line) or combined_line[-1].isalnum() and stripped_line[0].isalnum():
                 combined_line += stripped_line
             else:
-                # Otherwise, save the combined line and reset for the next block
-                if combined_line:
-                    corrected_lines.append(combined_line)
+                corrected_lines.append(combined_line)
                 combined_line = stripped_line
+        else:
+            combined_line = stripped_line
 
-    # Append the last combined line if it exists
     if combined_line:
         corrected_lines.append(combined_line)
 
