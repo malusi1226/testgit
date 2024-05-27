@@ -1,4 +1,3 @@
-
 import fitz
 import re
 
@@ -11,25 +10,30 @@ def pdf_to_text(pdf_path):
     return text
 
 def clean_text(text):
-    url_pattern = re.compile(r'(https?://\S+|www\.\S+)')
+    url_pattern = re.compile(r'https?://\S+|www\.\S+')
     lines = text.split('\n')
     cleaned_lines = []
     buffer = ''
-
+    
     for line in lines:
         if url_pattern.search(line):
-            # 如果缓冲区中有数据，将缓冲区内容添加到清理后的行
+            # 处理被切割的URL
+            if buffer:
+                buffer += line
+                cleaned_lines.append(buffer)
+                buffer = ''
+            else:
+                buffer = line
+        else:
+            # 处理非URL行
             if buffer:
                 cleaned_lines.append(buffer)
                 buffer = ''
-            # 直接添加包含URL的行
-            cleaned_lines.append(line)
-        else:
-            # 非URL行添加到缓冲区
-            if buffer:
-                buffer += ' ' + line
-            else:
-                buffer = line
+            if line.strip():  # 只处理非空行
+                if cleaned_lines and not cleaned_lines[-1].endswith(' '):
+                    cleaned_lines[-1] += ' ' + line
+                else:
+                    cleaned_lines.append(line)
 
     # 处理最后剩余的缓冲区内容
     if buffer:
