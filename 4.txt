@@ -1,60 +1,29 @@
-import fitz
-import re
-
-def pdf_to_text(pdf_path):
-    doc = fitz.open(pdf_path)
-    text = ''
-    for page_num in range(len(doc)):
-        page = doc.load_page(page_num)
-        text += page.get_text("text") + '\n'
-    return text
-
-def clean_text(text):
-    url_pattern = re.compile(r'(https?://\S+|www\.\S+)')
+def correct_line_breaks(text):
     lines = text.split('\n')
-    cleaned_lines = []
-    buffer = ''
+    corrected_lines = []
+    combined_line = ""
+    url_pattern = re.compile(r'^https?://')
+    tag_start_pattern = re.compile(r'^<[^>]+$')
+    tag_end_pattern = re.compile(r'.+>$')
 
     for line in lines:
-        if url_pattern.search(line):
-            if buffer:
-                # 如果缓冲区中有数据，表示之前的部分URL，连接起来
-                buffer += line.strip()
-                cleaned_lines.append(buffer)
-                buffer = ''
-            else:
-                # 当前行直接包含完整URL
-                cleaned_lines.append(line.strip())
+        stripped_line = line.strip()
+        
+        # If the current line starts with a URL or a tag, combine it with the previous line
+        if url_pattern.match(stripped_line) or tag_start_pattern.match(stripped_line):
+            combined_line += stripped_line
         else:
-            # 处理非URL行
-            if buffer:
-                # 之前缓冲区中有部分URL，处理并清空缓冲区
-                cleaned_lines.append(buffer)
-                buffer = ''
-            if line.strip():  # 只处理非空行
-                if cleaned_lines and not cleaned_lines[-1].endswith(' '):
-                    cleaned_lines[-1] += ' ' + line.strip()
-                else:
-                    cleaned_lines.append(line.strip())
+            # If the previous combined line ends with a tag, just add the current line
+            if tag_end_pattern.match(combined_line):
+                combined_line += stripped_line
+            else:
+                # Otherwise, save the combined line and reset for the next block
+                if combined_line:
+                    corrected_lines.append(combined_line)
+                combined_line = stripped_line
 
-    # 处理最后剩余的缓冲区内容
-    if buffer:
-        cleaned_lines.append(buffer)
+    # Append the last combined line if it exists
+    if combined_line:
+        corrected_lines.append(combined_line)
 
-    cleaned_text = '\n'.join(cleaned_lines)
-    return cleaned_text
-
-def save_text_to_file(text, output_path):
-    with open(output_path, 'w', encoding='utf-8') as file:
-        file.write(text)
-
-def process_pdf(pdf_path, output_text_path):
-    # 步骤1: 将PDF转换为文本
-    text = pdf_to_text(pdf_path)
-    # 步骤2: 清理文本中的换行符
-    cleaned_text = clean_text(text)
-    # 步骤3: 将清理后的文本保存到新文件中
-    save_text_to_file(cleaned_text, output_text_path)
-
-# 示例调用
-# process_pdf('input.pdf', 'output.txt')
+    return '\n'.join(corrected_lines)
