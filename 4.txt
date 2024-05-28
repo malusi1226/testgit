@@ -1,1 +1,35 @@
 
+import re
+
+def correct_line_breaks(self, text):
+    """
+    Modify incorrectly cut links, attempting to intelligently recombine them,
+    without altering other line breaks.
+    """
+    lines = text.split('\n')
+    combined_line = ""
+    corrected_lines = []
+    
+    # Improved regex to detect the start of URLs or potential continuation of URLs
+    key_fragments_start = re.compile(r'(https?|ftp|file)://|www\.')
+    key_fragments_end = re.compile(r'\.com|\.org|\.net|\.html|\.pdf|\.xls|\.xlsx|\.mp3|\.docx|%[0-9A-Fa-f]{2}|servicenow|confluence|id=')
+    
+    for line in lines:
+        stripped_line = line.strip()
+        if combined_line:
+            # Check if the current line seems to be a continuation of a URL
+            if (key_fragments_start.search(combined_line) and not key_fragments_end.search(combined_line)) or \
+               (key_fragments_start.search(stripped_line) or key_fragments_end.search(stripped_line)) or \
+               (combined_line and stripped_line and combined_line[-1].isalnum() and stripped_line[0].isalnum()):
+                combined_line += stripped_line
+            else:
+                corrected_lines.append(combined_line)
+                combined_line = stripped_line
+        else:
+            combined_line = stripped_line
+    
+    if combined_line:
+        corrected_lines.append(combined_line)
+    
+    formatted_text = "\n".join(corrected_lines)
+    return formatted_text
