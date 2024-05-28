@@ -1,4 +1,3 @@
-
 def correct_line_breaks2(text):
     """Modify incorrectly cut links, attempting to intelligently recombine them."""
     lines = text.split('\n')
@@ -20,7 +19,8 @@ def correct_line_breaks2(text):
         else:
             if combined_line:
                 corrected_lines.append(combined_line)
-            combined_line = stripped_line
+                combined_line = ""
+            corrected_lines.append(line)
     
     if combined_line:
         corrected_lines.append(combined_line)
