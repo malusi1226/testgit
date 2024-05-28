@@ -1,30 +1,29 @@
-def correct_line_breaks2(text):
-    """Modify incorrectly cut links, attempting to intelligently recombine them."""
+def correct_line_breaks4(text):
     lines = text.split('\n')
     combined_line = ""
     corrected_lines = []
-    
-    # Improved regex to detect the start of URLs or potential continuation of URLs
-    key_fragments_start = re.compile(r'(https?|ftp|file)://|www\.')
-    key_fragments_end = re.compile(r'\.com|\.org|\.net|\.html|\.pdf|\.xls|\.xlsx|\.mp3|\.docx|%[0-9A-Fa-f]{2}|servicenow|confluence\+|id=')
-    
+
+    # 定义关键字和文件扩展名
+    key_fragments = re.compile(r'(https?|ftp|file)://|\.com|\.org|\.net|\.html|\.pdf|\.xls|\.xlsx|\.mp3|\.docx|%[0-9A-Fa-f]{2}|servicenow|confluence|\+|id=')
+    url_pattern = re.compile(r'(https?|ftp|file)://[^\s/$.?#].[^\s]*')
+
     for line in lines:
         stripped_line = line.strip()
-        
-        # Check if the current line should be part of the previous line (likely a URL)
-        if combined_line and ((key_fragments_start.search(combined_line) and not key_fragments_end.search(combined_line)) or \
-                             key_fragments_start.search(stripped_line) or \
-                             key_fragments_end.search(stripped_line)):
-            combined_line += stripped_line
-        else:
-            if combined_line:
+
+        if combined_line:
+            # 检查当前行是否是前一行的延续
+            if key_fragments.search(stripped_line) or (url_pattern.match(combined_line + stripped_line)) or (combined_line[-1].isalnum() and stripped_line[0].isalnum()):
+                combined_line += stripped_line
+            else:
                 corrected_lines.append(combined_line)
-                combined_line = ""
-            corrected_lines.append(line)
-    
+                combined_line = stripped_line
+        else:
+            combined_line = stripped_line
+
     if combined_line:
         corrected_lines.append(combined_line)
-    
-    # Join lines with '\n' to maintain original line breaks except for URLs
+
+    # 确保在需要的地方添加换行符
     formatted_text = '\n'.join(corrected_lines)
+
     return formatted_text
