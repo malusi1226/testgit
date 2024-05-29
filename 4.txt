@@ -1,4 +1,3 @@
-
 def merge_broken_links(text):
     lines = text.split("\n")
     merged_lines = []
@@ -7,10 +6,10 @@ def merge_broken_links(text):
     while i < len(lines):
         if 'http' in lines[i]:
             potential_link = lines[i]
-            if (i + 1 < len(lines) and re.search(r'[%=?.&@#\-1+]|(html|xlsx|web|com|mp4|pdf)', lines[i + 1])):
-                potential_link += lines[i + 1].strip()
-                if (i + 2 < len(lines) and re.search(r'\b[a-zA-Z0-9]+\b', lines[i + 2]) and len(lines[i + 2].strip()) < 20):
-                    potential_link += lines[i + 2].strip()
+            if i + 1 < len(lines) and re.search(r'[%=?.&@#\-1+]|(html|xlsx|web|com|mp4|pdf)', lines[i + 1]):
+                potential_link += lines[i + 1]
+                if i + 2 < len(lines) and re.search(r'\b[a-zA-Z0-9]+\b', lines[i + 2]) and len(lines[i + 2].strip()) < 20:
+                    potential_link += lines[i + 2]
                     i += 3
                 else:
                     i += 2
