@@ -7,14 +7,12 @@ def merge_broken_links(text):
         if 'http' in lines[i]:
             potential_link = lines[i]
             if i + 1 < len(lines):
-                # If the next line matches specified symbols or patterns
                 next_line = lines[i + 1]
                 if re.search(r'[%=?.&@#\-1+]|(html|xlsx|web|com|mp4|pdf)', next_line):
                     potential_link += next_line
-                    # If the line after the next one matches short alphanumeric patterns
                     if i + 2 < len(lines):
                         third_line = lines[i + 2]
-                        if re.search(r'\b[a-zA-Z0-9]+\b', third_line) and len(third_line.strip()) < 20:
+                        if re.search(r'[%=?.&@#\-1+]|(html|xlsx|web|com|mp4|pdf)', third_line) or (re.search(r'\b[a-zA-Z0-9]+\b', third_line) and len(third_line.strip()) < 20):
                             potential_link += third_line
                             i += 3
                         else:
