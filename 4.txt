@@ -1,25 +1,8 @@
-    
-    # 分层抽样
-    X_train_current = X_train_vectorized[:current_size]
-    y_train_current = y_train[:current_size]
-    
-    # 计算每个标签的样本数
-    label_counts = y_train_current.value_counts()
-    min_label_count = min(label_counts)
-    
-    # 如果某个标签的样本数不足步长的一半，停止训练
-    if min_label_count < step_size // 2:
-        print(f"样本不足，停止训练。当前数据大小: {current_size}")
-        break
-    
-    # 分别抽取相同数量的label0和label1样本
-    label0_indices = y_train_current[y_train_current == 0].index[:step_size // 2].tolist()
-    label1_indices = y_train_current[y_train_current == 1].index[:step_size // 2].tolist()
-    
-    balanced_indices = label0_indices + label1_indices
-    
-    X_train_balanced = X_train_vectorized[balanced_indices]
-    y_train_balanced = y_train_current.loc[balanced_indices]
-    
-    # 训练模型
-    model.fit(X_train_balanced, y_train_balanced)
+# 从train_df中筛选标签为1的数据，并限制最多1000条
+label1_df = train_df[train_df['label'] == 1]
+if len(label1_df) > 1000:
+    label1_df = label1_df.sample(n=1000, random_state=42)
+
+# 将筛选后的标签为1的数据与其他标签的数据合并
+other_labels_df = train_df[train_df['label'] != 1]
+train_df = pd.concat([label1_df, other_labels_df], ignore_index=True)
