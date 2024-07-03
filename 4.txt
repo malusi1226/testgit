@@ -1,1 +1,15 @@
 
+    # 分层抽样
+    X_train_current = X_train_vectorized[:current_size]
+    y_train_current = y_train[:current_size]
+    
+    # 计算每个标签的样本数
+    label_counts = y_train_current.value_counts()
+    min_label_count = min(label_counts)
+    
+    # 分别抽取相同数量的label0和label1样本
+    balanced_indices = y_train_current[y_train_current == 0].index[:min_label_count].tolist() + \
+                       y_train_current[y_train_current == 1].index[:min_label_count].tolist()
+    
+    X_train_balanced = X_train_vectorized[balanced_indices]
+    y_train_balanced = y_train_current.loc[balanced_indices]
